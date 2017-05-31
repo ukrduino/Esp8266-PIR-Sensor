@@ -5,9 +5,6 @@
 const char* ssid = "";
 const char* password = "";
 
-const String arm = "zff343";
-const String disarm = "45sfdg";
-const String getStatus = "fsf255";
 const byte greenLedPin = 12;
 const byte redLedPin = 15;
 const byte blueLedPin = 13;
@@ -18,7 +15,7 @@ const byte boardLedPin = 2;
 // specify the port to listen on as an argument
 WiFiServer server(3333);
 bool motionDetected = false; //0 - OK , 1 - Alarm
-bool sensorArmed = false;
+bool sensorEnabled = false;
 byte pirState = LOW;             // we start, assuming no motion detected
 byte val = LOW;                    // variable for reading the pin status
 
@@ -34,7 +31,7 @@ void setup() {
   digitalWrite(greenLedPin, LOW);
   digitalWrite(redLedPin, LOW);
   digitalWrite(blueLedPin, LOW);
-  digitalWrite(blueLedPin, HIGH);
+  digitalWrite(boardLedPin, HIGH);
   // Connect to WiFi network
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -75,17 +72,17 @@ void loop() {
   String req = client.readStringUntil('\r');
   Serial.println(req);
   client.flush();
-  if (req.indexOf(arm) != -1) {
-    sensorArmed = true;
+  if (req.indexOf("enable") != -1) {
+    sensorEnabled = true;
     sendResponse(client, getStatusResponse());
   }
 
-  else if (req.indexOf(disarm) != -1) {
-    sensorArmed = false;
+  else if (req.indexOf("disable") != -1) {
+    sensorEnabled = false;
     resetSensor();
     sendResponse(client, getStatusResponse());
   }
-  else if (req.indexOf(getStatus) != -1) {
+  else if (req.indexOf("getStatus") != -1) {
     sendResponse(client, getStatusResponse());
   }
   else {
@@ -104,8 +101,8 @@ String getStatusResponse() {
   StaticJsonBuffer<200> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["motionDetected"] = motionDetected;
-  root["sensorArmed"] = sensorArmed;
-  root["activeTimeMilis"] = millis();
+  root["sensorEnabled"] = sensorEnabled;
+  root["activeTimeSeconds"] = millis()/1000;
   String output;
   root.printTo(output);
   Serial.println("------------ SensorStatus response-----------");
@@ -121,7 +118,7 @@ void askSensor() {
     if (pirState == LOW) {
       Serial.println("Motion detected!");
       // We only want to print on the output change, not state
-      if (sensorArmed) {
+      if (sensorEnabled) {
         if (!motionDetected) {
           motionDetected = true;
           return;
@@ -145,17 +142,17 @@ void resetSensor() {
 }
 
 void showSensorStatus() {
-  if (sensorArmed && motionDetected) {
+  if (sensorEnabled && motionDetected) {
     digitalWrite(greenLedPin, LOW);
     digitalWrite(redLedPin, LOW);
     digitalWrite(blueLedPin, HIGH);
   }
-  else if (sensorArmed && !motionDetected) {
+  else if (sensorEnabled && !motionDetected) {
     digitalWrite(greenLedPin, LOW);
     digitalWrite(redLedPin, HIGH);
     digitalWrite(blueLedPin, LOW);
   }
-  else if (!sensorArmed) {
+  else if (!sensorEnabled) {
     digitalWrite(greenLedPin, HIGH);
     digitalWrite(redLedPin, LOW);
     digitalWrite(blueLedPin, LOW);
