@@ -35,6 +35,7 @@ void setup() {
   // Connect to WiFi network
   Serial.print("Connecting to ");
   Serial.println(ssid);
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -50,7 +51,8 @@ void setup() {
   // Print the IP address
   Serial.print(WiFi.localIP());
   Serial.println(":3333");
-  delay(60000); //sensor calibration period
+  sendSensorIp();
+  delay(30000); //sensor calibration period
 }
 
 void loop() {
@@ -102,7 +104,7 @@ String getStatusResponse() {
   JsonObject& root = jsonBuffer.createObject();
   root["motionDetected"] = motionDetected;
   root["sensorEnabled"] = sensorEnabled;
-  root["activeTimeSeconds"] = millis()/1000;
+  root["activeTimeSeconds"] = millis() / 1000;
   String output;
   root.printTo(output);
   Serial.println("------------ SensorStatus response-----------");
@@ -164,3 +166,42 @@ void sendResponse(WiFiClient client, String response) {
   Serial.println("------------ response sent-----------");
 }
 
+void sendSensorIp() {
+  // Remote site information
+  const char main_board_http_site[] = "192.168.1.38";
+  const int main_board_http_port = 3000;
+  WiFiClient client;
+  if (!client.connect(main_board_http_site, main_board_http_port)) {
+    Serial.println("connection failed");
+    return;
+  }
+  // We now create a URI for the request
+  String ipaddress = WiFi.localIP().toString();
+  String url = "/register";
+  url += "?ip=";
+  url += ipaddress;
+  Serial.print("Requesting URL: ");
+  Serial.println(url);
+
+  // This will send the request to the server
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: " + main_board_http_site + "\r\n" +
+               "Connection: close\r\n\r\n");
+  unsigned long timeout = millis();
+  while (client.available() == 0) {
+    if (millis() - timeout > 5000) {
+      Serial.println(">>> Client Timeout !");
+      client.stop();
+      return;
+    }
+  }
+
+  // Read all the lines of the reply from server and print them to Serial
+  while (client.available()) {
+    String line = client.readStringUntil('\r');
+    Serial.print(line);
+  }
+
+  Serial.println();
+  Serial.println("closing connection");
+}
